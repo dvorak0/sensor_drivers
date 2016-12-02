@@ -6,6 +6,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "-std=c++11 -O3 -Wall")
 
 find_package(catkin REQUIRED COMPONENTS
     roscpp
+    sensor_msgs
+    message_filters
     )
 
 catkin_package()
@@ -15,7 +17,7 @@ include_directories(
     /opt/mvIMPACT_acquire
     )
 
-add_executable(bluefox2 
+add_executable(bluefox2
     src/camera_node.cpp
     src/camera.cpp
     )

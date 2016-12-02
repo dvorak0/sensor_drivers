@@ -1,5 +1,7 @@
 #include "camera.h"
 
+using namespace std;
+
 BluefoxCamera::BluefoxCamera(mvIMPACT::acquire::Device *_device)
     : device(_device), fi(_device), s(_device)
 {
@@ -7,9 +9,11 @@ BluefoxCamera::BluefoxCamera(mvIMPACT::acquire::Device *_device)
 
     // basic setting
     s.cameraSetting.restoreDefault();
-    s.cameraSetting.expose_us.write(10000);
-    s.cameraSetting.triggerSource.write(mvIMPACT::acquire::ctsDigIn0);
-    s.cameraSetting.triggerMode.write(mvIMPACT::acquire::ctmOnHighLevel);
+    s.cameraSetting.expose_us.write(300);
+    //s.cameraSetting.binningMode.write(mvIMPACT::acquire::TCameraBinningMode::cbmBinningHV);
+    s.cameraSetting.triggerMode.write(ctmOnHighLevel);
+    s.cameraSetting.triggerSource.write(ctsDigIn0);
+    //s.cameraSetting.triggerMode.write(ctmOnDemand);
 
     int result = DMR_NO_ERROR;
     SystemSettings ss(device);
@@ -28,16 +32,17 @@ BluefoxCamera::BluefoxCamera(mvIMPACT::acquire::Device *_device)
 
 void BluefoxCamera::loop()
 {
-    while (true)
+    while (device->isOpen())
     {
-        int requestNr = INVALID_ID;
-        requestNr = fi.imageRequestWaitFor(-1);
+        int requestNr = fi.imageRequestWaitFor(-1);
         if (fi.isRequestNrValid(requestNr))
         {
-            pRequest = fi.getRequest(requestNr);
+            const Request *pRequest = fi.getRequest(requestNr);
             if (pRequest->isOK())
             {
-                vector<unsigned char> data(pRequest->imageHeight.read() * pRequest->imageWidth.read());
+                imageHeight = pRequest->imageHeight.read();
+                imageWidth = pRequest->imageWidth.read();
+                std::vector<unsigned char> data(imageHeight * imageWidth);
                 memcpy(data.data(), pRequest->imageData.read(), data.size());
                 std::lock_guard<std::mutex> lock(barrier);
                 data_q.push(std::move(data));
@@ -76,6 +81,11 @@ vector<unsigned char> BluefoxCamera::getImg()
     assert(data_q.front().size() == 0);
     data_q.pop();
     return img;
+}
+
+BluefoxCamera::~BluefoxCamera()
+{
+    device->close();
 }
 
 BluefoxManager::BluefoxManager()
